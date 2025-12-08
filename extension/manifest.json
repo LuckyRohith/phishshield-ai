@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "PhishShield AI",
+  "description": "Detects phishing and scam websites in real time using heuristic analysis.",
+  "version": "1.0",
+  "permissions": ["tabs", "activeTab"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PhishShield AI"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "128": "icon128.png"
+  }
+}
