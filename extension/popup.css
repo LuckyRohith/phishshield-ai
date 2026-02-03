@@ -91,6 +91,84 @@ h1 span {
   color: #9ca3af;
 }
 
+.risk-breakdown {
+  border-top: 1px solid #111827;
+  padding-top: 6px;
+  margin-bottom: 8px;
+}
+
+.risk-breakdown h3 {
+  margin: 0 0 4px 0;
+  font-size: 12px;
+}
+
+.risk-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #9ca3af;
+  margin-bottom: 2px;
+}
+
+.scan-history {
+  border-top: 1px solid #111827;
+  padding-top: 6px;
+}
+
+.scan-history h3 {
+  margin: 0 0 4px 0;
+  font-size: 12px;
+}
+
+#history-list {
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid #1f2937;
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-url {
+  flex: 1;
+  word-break: break-all;
+  margin-right: 4px;
+}
+
+.history-status {
+  font-weight: bold;
+  font-size: 9px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.history-status.safe {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.history-status.danger {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.history-time {
+  font-size: 8px;
+  color: #6b7280;
+  margin-top: 1px;
+}
+
 footer {
   margin-top: 6px;
   text-align: center;

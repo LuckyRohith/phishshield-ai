@@ -17,9 +17,32 @@
 
     <button id="scan-btn">Rescan</button>
 
+    <div class="risk-breakdown">
+      <h3>Risk Breakdown</h3>
+      <div class="risk-item">
+        <span>URL Risk:</span>
+        <span id="url-risk">0</span>
+      </div>
+      <div class="risk-item">
+        <span>Brand Risk:</span>
+        <span id="brand-risk">0</span>
+      </div>
+      <div class="risk-item">
+        <span>Content Risk:</span>
+        <span id="content-risk">0</span>
+      </div>
+    </div>
+
     <div class="details">
       <h3>Details</h3>
       <p id="details-text">Waiting for analysis...</p>
+    </div>
+
+    <div class="scan-history">
+      <h3>Recent Scans</h3>
+      <div id="history-list">
+        <p id="no-history">No recent scans</p>
+      </div>
     </div>
 
     <footer>
