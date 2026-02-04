@@ -202,6 +202,10 @@ function levenshteinDistance(str1, str2) {
   return matrix[str2.length][str1.length];
 }
 
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", service: "PhishShield AI" });
+});
+
 app.post("/analyze", async (req, res) => {
   try {
     const { url } = req.body;
