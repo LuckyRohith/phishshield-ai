@@ -127,21 +127,47 @@ function updateUI(result, url, isOffline = false) {
   loadScanHistory();
 }
 
+// Global flag to prevent multiple concurrent analyses
+let isAnalyzing = false;
+
+// Check if analysis is in progress from storage
+chrome.storage.local.get(['isAnalyzing'], (result) => {
+  isAnalyzing = result.isAnalyzing || false;
+  // Update button state based on analysis status
+  if (isAnalyzing) {
+    scanBtn.disabled = true;
+    scanBtn.textContent = "Analyzing...";
+  } else {
+    scanBtn.disabled = false;
+    scanBtn.textContent = "Rescan";
+  }
+});
+
 // Analyze URL with public backend and comprehensive error handling
 async function analyze(url) {
+  if (isAnalyzing) {
+    console.log("Analysis already in progress, skipping...");
+    return;
+  }
+
+  isAnalyzing = true;
+  scanBtn.disabled = true;
+  scanBtn.textContent = "Analyzing...";
+
   const urlElement = document.getElementById("url");
   const statusBox = document.getElementById("status-box");
   const statusText = document.getElementById("status-text");
   const scoreText = document.getElementById("score-text");
   const detailsText = document.getElementById("details-text");
 
-  // Skip analysis for chrome-extension URLs
-  if (url.startsWith('chrome-extension://')) {
+  // Skip analysis for chrome-extension and chrome:// URLs
+  if (url.startsWith('chrome-extension://') || url.startsWith('chrome://')) {
     statusBox.classList.remove("neutral", "safe", "danger");
     statusBox.classList.add("safe");
-    statusText.textContent = "✅ Extension Page";
+    statusText.textContent = "✅ Chrome Internal Page";
     scoreText.textContent = "Risk Score: 0 / 100";
-    detailsText.textContent = "This is a Chrome extension page and cannot be analyzed.";
+    detailsText.textContent = "This is a Chrome internal page and cannot be analyzed.";
+    isAnalyzing = false;
     return;
   }
 
@@ -155,31 +181,49 @@ async function analyze(url) {
   detailsText.textContent = "Contacting analysis server...";
 
   try {
-    // Use public backend endpoint with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    // Try endpoints in parallel for faster response
+    const endpoints = [
+      "https://phishshield-ai-c9n7.onrender.com/analyze",
+      "http://localhost:5000/analyze"
+    ];
 
-    const response = await fetch("http://localhost:5000/analyze", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ url }),
-      signal: controller.signal
+    const fetchPromises = endpoints.map(endpoint => {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ url }),
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
+          }
+
+          const responseData = await response.json();
+
+          // Validate response structure
+          if (!responseData || typeof responseData.risk_score !== 'number') {
+            throw new Error("Invalid response format");
+          }
+
+          resolve(responseData);
+        } catch (err) {
+          reject(err);
+        }
+      });
     });
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    // Validate response structure
-    if (!result || typeof result.risk_score !== 'number') {
-      throw new Error("Invalid response format");
-    }
+    // Use Promise.race to get the first successful response
+    const result = await Promise.race(fetchPromises);
 
     updateUI(result, url);
   } catch (err) {
@@ -192,7 +236,7 @@ async function analyze(url) {
     if (err.name === 'AbortError') {
       errorMessage = "Request timeout: Server took too long to respond.";
       isOffline = true;
-    } else if (err.message.includes('fetch') || err.message.includes('NetworkError')) {
+    } else if (err.message.includes('fetch') || err.message.includes('NetworkError') || err.name === 'TypeError') {
       errorMessage = "Cannot connect to analysis server. Check your internet connection.";
       isOffline = true;
     } else if (err.message.includes('Server error')) {
@@ -210,11 +254,20 @@ async function analyze(url) {
     if (isOffline) {
       detailsText.textContent = errorMessage;
     }
+  } finally {
+    isAnalyzing = false;
+    chrome.storage.local.set({ isAnalyzing: false });
+    if (scanBtn) {
+      scanBtn.disabled = false;
+      scanBtn.textContent = "Rescan";
+    }
   }
 }
 
+let scanBtn;
+
 document.addEventListener("DOMContentLoaded", async () => {
-  const scanBtn = document.getElementById("scan-btn");
+  scanBtn = document.getElementById("scan-btn");
 
   scanBtn.addEventListener("click", async () => {
     try {
