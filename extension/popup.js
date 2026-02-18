@@ -21,13 +21,22 @@ function loadScanHistory() {
   const historyList = document.getElementById('history-list');
   const noHistory = document.getElementById('no-history');
 
-  if (history.length === 0) {
-    noHistory.style.display = 'block';
-    historyList.innerHTML = '<p id="no-history">No recent scans</p>';
+  if (!historyList) {
+    console.error("history-list element not found in popup.html");
     return;
   }
 
-  noHistory.style.display = 'none';
+  if (!noHistory) {
+    console.warn("no-history element not found in popup.html");
+  }
+
+  if (history.length === 0) {
+    if (noHistory) noHistory.style.display = 'block';
+    historyList.innerHTML = '<p>No recent scans</p>';
+    return;
+  }
+
+  if (noHistory) noHistory.style.display = 'none';
   historyList.innerHTML = '';
 
   history.forEach(scan => {
@@ -36,7 +45,8 @@ function loadScanHistory() {
 
     const urlSpan = document.createElement('span');
     urlSpan.className = 'history-url';
-    urlSpan.textContent = scan.url.length > 50 ? scan.url.substring(0, 47) + '...' : scan.url;
+    urlSpan.textContent =
+      scan.url.length > 50 ? scan.url.substring(0, 47) + '...' : scan.url;
 
     const statusSpan = document.createElement('span');
     statusSpan.className = `history-status ${scan.is_phishing ? 'danger' : 'safe'}`;
@@ -51,7 +61,6 @@ function loadScanHistory() {
     item.appendChild(statusSpan);
     item.appendChild(timeSpan);
 
-    // Add click handler to re-analyze
     item.addEventListener('click', () => {
       analyze(scan.url);
     });
@@ -130,19 +139,6 @@ function updateUI(result, url, isOffline = false) {
 // Global flag to prevent multiple concurrent analyses
 let isAnalyzing = false;
 
-// Check if analysis is in progress from storage
-chrome.storage.local.get(['isAnalyzing'], (result) => {
-  isAnalyzing = result.isAnalyzing || false;
-  // Update button state based on analysis status
-  if (isAnalyzing) {
-    scanBtn.disabled = true;
-    scanBtn.textContent = "Analyzing...";
-  } else {
-    scanBtn.disabled = false;
-    scanBtn.textContent = "Rescan";
-  }
-});
-
 // Analyze URL with public backend and comprehensive error handling
 async function analyze(url) {
   if (isAnalyzing) {
@@ -151,8 +147,10 @@ async function analyze(url) {
   }
 
   isAnalyzing = true;
-  scanBtn.disabled = true;
-  scanBtn.textContent = "Analyzing...";
+  if (scanBtn) {
+    scanBtn.disabled = true;
+    scanBtn.textContent = "Analyzing...";
+  }
 
   const urlElement = document.getElementById("url");
   const statusBox = document.getElementById("status-box");
@@ -181,49 +179,32 @@ async function analyze(url) {
   detailsText.textContent = "Contacting analysis server...";
 
   try {
-    // Try endpoints in parallel for faster response
-    const endpoints = [
-      "https://phishshield-ai-c9n7.onrender.com/analyze",
-      "http://localhost:5000/analyze"
-    ];
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-    const fetchPromises = endpoints.map(endpoint => {
-      return new Promise(async (resolve, reject) => {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-
-          const response = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ url }),
-            signal: controller.signal
-          });
-
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
-          }
-
-          const responseData = await response.json();
-
-          // Validate response structure
-          if (!responseData || typeof responseData.risk_score !== 'number') {
-            throw new Error("Invalid response format");
-          }
-
-          resolve(responseData);
-        } catch (err) {
-          reject(err);
-        }
-      });
+    const response = await fetch("https://phishshield-ai-c9n7.onrender.com/analyze", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ url }),
+      signal: controller.signal
     });
 
-    // Use Promise.race to get the first successful response
-    const result = await Promise.race(fetchPromises);
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+
+    const responseData = await response.json();
+
+    // Validate response structure
+    if (!responseData || typeof responseData.risk_score !== 'number') {
+      throw new Error("Invalid response format");
+    }
+
+    const result = responseData;
 
     updateUI(result, url);
   } catch (err) {
@@ -269,14 +250,18 @@ let scanBtn;
 document.addEventListener("DOMContentLoaded", async () => {
   scanBtn = document.getElementById("scan-btn");
 
-  scanBtn.addEventListener("click", async () => {
-    try {
-      const url = await getCurrentTabUrl();
-      analyze(url);
-    } catch (err) {
-      console.error(err);
-    }
-  });
+  if (!scanBtn) {
+    console.error("Scan button not found in popup.html");
+  } else {
+    scanBtn.addEventListener("click", async () => {
+      try {
+        const url = await getCurrentTabUrl();
+        analyze(url);
+      } catch (err) {
+        console.error(err);
+      }
+    });
+  }
 
   try {
     const url = await getCurrentTabUrl();
